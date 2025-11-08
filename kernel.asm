@@ -2,7 +2,6 @@ bits 16
 org 0x7E00    ; Kernel loads at 0x7E00
 
 start:
-    ; Set up segments PROPERLY
     mov ax, 0
     mov ds, ax
     mov es, ax
@@ -17,17 +16,17 @@ start:
     mov si, boot_screen
     call print_string
 
-    ; Wait 4-5 seconds (very long)
-    mov cx, 0x0010      ; Outer loop
+    ; Delay loop (~4–5 seconds)
+    mov cx, 0x0010
 .seconds_loop:
     push cx
-    mov cx, 0xFFFF      ; Middle loop  
+    mov cx, 0xFFFF
 .middle_loop:
     push cx
-    mov cx, 0x0FFF      ; Inner loop
+    mov cx, 0x0FFF
 .inner_loop:
     nop
-    nop  
+    nop
     nop
     nop
     nop
@@ -38,36 +37,30 @@ start:
     pop cx
     loop .seconds_loop
 
-    ; Clear screen again
+    ; Redraw clean UI
     mov ax, 0x0003
     int 0x10
-
-    ; Draw professional UI
     call draw_border
     call draw_header
     
     ; Position cursor for content
     mov ah, 0x02
     mov bh, 0x00
-    mov dh, 4      ; Below header
-    mov dl, 3      ; Inside left border
-    int 0x10
-    
-    ; Print welcome message with proper wrapping
-    mov si, welcome_msg
-    call print_string_wrapped
-    
-    ; Update status bar
-    call update_status
-    
-    ; Position cursor for input
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 22     ; Fixed input line
+    mov dh, 4
     mov dl, 3
     int 0x10
     
-    ; Print prompt
+    mov si, welcome_msg
+    call print_string_wrapped
+    
+    call update_status
+    
+    ; Input prompt
+    mov ah, 0x02
+    mov bh, 0x00
+    mov dh, 22
+    mov dl, 3
+    int 0x10
     mov ah, 0x0E
     mov bh, 0x00
     mov al, '>'
@@ -75,12 +68,10 @@ start:
     mov al, ' '
     int 0x10
 
-    ; Now enter the shell loop
     jmp shell_loop
 
-; === Professional UI Functions ===
+; === UI Functions ===
 
-; Draw screen border
 draw_border:
     pusha
     
@@ -92,14 +83,13 @@ draw_border:
     int 0x10
     mov cx, 80
     mov ah, 0x0E
-    mov al, 0xC4   ; Single horizontal line
+    mov al, 0xC4
 .top:
     int 0x10
     loop .top
     
     ; Bottom border
     mov ah, 0x02
-    mov bh, 0x00
     mov dh, 24
     mov dl, 0
     int 0x10
@@ -116,18 +106,14 @@ draw_border:
     cmp dh, 24
     jge .corners
     
-    ; Left border
     mov ah, 0x02
-    mov bh, 0x00
     mov dl, 0
     int 0x10
     mov ah, 0x0E
-    mov al, 0xB3   ; Single vertical line
+    mov al, 0xB3
     int 0x10
     
-    ; Right border
     mov ah, 0x02
-    mov bh, 0x00
     mov dl, 79
     int 0x10
     mov ah, 0x0E
@@ -140,60 +126,50 @@ draw_border:
 .corners:
     ; Corners
     mov ah, 0x02
-    mov bh, 0x00
     mov dh, 0
     mov dl, 0
     int 0x10
     mov ah, 0x0E
-    mov al, 0xDA   ; Top-left
+    mov al, 0xDA
     int 0x10
     
     mov ah, 0x02
-    mov bh, 0x00
     mov dl, 79
     int 0x10
     mov ah, 0x0E
-    mov al, 0xBF   ; Top-right
+    mov al, 0xBF
     int 0x10
     
     mov ah, 0x02
-    mov bh, 0x00
     mov dh, 24
     mov dl, 0
     int 0x10
     mov ah, 0x0E
-    mov al, 0xC0   ; Bottom-left
+    mov al, 0xC0
     int 0x10
     
     mov ah, 0x02
-    mov bh, 0x00
     mov dl, 79
     int 0x10
     mov ah, 0x0E
-    mov al, 0xD9   ; Bottom-right
+    mov al, 0xD9
     int 0x10
     
     popa
     ret
 
-; Draw header
 draw_header:
     pusha
-    
-    ; Position below top border
     mov ah, 0x02
     mov bh, 0x00
     mov dh, 1
     mov dl, 2
     int 0x10
     
-    ; Print header
     mov si, header_title
     call print_string_centered
     
-    ; Separator line below header
     mov ah, 0x02
-    mov bh, 0x00
     mov dh, 2
     mov dl, 2
     int 0x10
@@ -207,22 +183,17 @@ draw_header:
     popa
     ret
 
-; Update status bar
 update_status:
     pusha
-    
-    ; Position at bottom row (inside borders)
     mov ah, 0x02
     mov bh, 0x00
     mov dh, 24
     mov dl, 2
     int 0x10
     
-    ; Print left status
     mov si, status_left
     call print_string
     
-    ; Clear the rest of the status line
     mov cx, 76
     sub cx, status_left_len
 .clear_loop:
@@ -231,18 +202,14 @@ update_status:
     int 0x10
     loop .clear_loop
     
-    ; Position for time on right
     mov ah, 0x02
-    mov bh, 0x00
     mov dl, 60
     int 0x10
     
-    ; Get and display time
     mov ah, 0x02
     int 0x1A
     jc .no_time
     
-    ; Display time
     mov al, ch
     call print_bcd
     mov al, ':'
@@ -250,7 +217,6 @@ update_status:
     int 0x10
     mov al, cl
     call print_bcd
-    
     jmp .done
     
 .no_time:
@@ -261,35 +227,29 @@ update_status:
     popa
     ret
 
-; === Enhanced Printing Functions ===
+; === Printing ===
 
-; Print string with word wrapping (respects borders)
 print_string_wrapped:
     pusha
-    mov bx, 3      ; Current column position (inside left border)
-    mov dh, [current_line] ; Current row
-    
+    mov bx, 3
+    mov dh, [current_line]
 .wrap_loop:
     lodsb
     test al, al
     jz .wrap_done
     
-    ; Handle newlines
-    cmp al, 13     ; Carriage return
+    cmp al, 13
     je .newline
-    cmp al, 10     ; Line feed
+    cmp al, 10
     je .newline
     
-    ; Check if we need to wrap
-    cmp bx, 77     ; Right border - 2
+    cmp bx, 77
     jl .print_char
     
-    ; Wrap to next line
     call .newline_no_inc
     jmp .wrap_loop
 
 .print_char:
-    ; Print character and update position
     mov ah, 0x0E
     mov bh, 0x00
     int 0x10
@@ -301,13 +261,12 @@ print_string_wrapped:
     jmp .wrap_loop
 
 .newline_no_inc:
-    ; Move to next line
     inc dh
     mov ah, 0x02
     mov bh, 0x00
-    mov dl, 3      ; Reset to left border + 1
+    mov dl, 3
     int 0x10
-    mov bx, 3      ; Reset column position
+    mov bx, 3
     mov [current_line], dh
     ret
 
@@ -316,19 +275,16 @@ print_string_wrapped:
     popa
     ret
 
-; Print string centered in the available width
 print_string_centered:
     pusha
-    ; Calculate center position (simple version)
     mov ah, 0x02
     mov bh, 0x00
-    mov dl, 25     ; Rough center
+    mov dl, 25
     int 0x10
     call print_string
     popa
     ret
 
-; Regular print string (for status bar, etc.)
 print_string:
     mov ah, 0x0E
     mov bh, 0x00
@@ -341,8 +297,8 @@ print_string:
 .done:
     ret
 
-; === String comparison function ===
-; === String comparison function ===
+; === String comparison ===
+
 compare_string:
     push si
     push di
@@ -367,38 +323,30 @@ compare_string:
     pop si
     ret
 
-; === Reboot System Function ===
+; === Reboot ===
+
 reboot_system:
     mov si, reboot_msg
     call print_string_wrapped
     
-    ; Wait a moment so user can see the message
     mov cx, 0xFFFF
 .delay:
     nop
     loop .delay
     
-    ; Method 1: BIOS reboot interrupt (soft reboot)
     int 0x19
-    
-    ; Method 2: If int 0x19 fails, try keyboard controller reset
     mov al, 0xFE
     out 0x64, al
     
-    ; Method 3: Triple fault (force CPU reset)
-    ; This will definitely work if others fail
     mov ax, 0
     mov ds, ax
     mov [0], ax
     jmp 0xFFFF:0x0000
-    
-    ret  ; We should never get here
+    ret
 
+; === Time Display ===
 
-
-; === Show Time Function ===
 show_time:
-    ; Get current time from BIOS
     mov ah, 0x02
     int 0x1A
     jc .time_error
@@ -406,20 +354,13 @@ show_time:
     mov si, time_msg
     call print_string_wrapped
     
-    ; Print hours
     mov al, ch
     call print_bcd
-    
-    ; Print colon
     mov ah, 0x0E
     mov al, ':'
     int 0x10
-    
-    ; Print minutes  
     mov al, cl
     call print_bcd
-    
-    ; New line handled by wrapping
     ret
 
 .time_error:
@@ -427,35 +368,32 @@ show_time:
     call print_string_wrapped
     ret
 
-; Helper: Print BCD number as ASCII
 print_bcd:
     push ax
     mov bl, al
-    shr al, 4              ; Get upper nibble (tens)
-    add al, '0'            ; Convert to ASCII
+    shr al, 4
+    add al, '0'
     mov ah, 0x0E
     int 0x10
     mov al, bl
-    and al, 0x0F           ; Get lower nibble (ones)
-    add al, '0'            ; Convert to ASCII
+    and al, 0x0F
+    add al, '0'
     int 0x10
     pop ax
     ret
 
-
-
 ; === Clear Content Area ===
+
 clear_content_area:
     pusha
-    mov cx, 18     ; Clear 18 lines of content (lines 4-21)
-    mov dh, 4      ; Start at line 4
+    mov cx, 18
+    mov dh, 4
 .clear_lines:
     mov ah, 0x02
     mov bh, 0x00
     mov dl, 3
     int 0x10
     
-    ; Clear this line completely (80 columns)
     mov bx, 76
 .clear_line:
     mov ah, 0x0E
@@ -467,7 +405,6 @@ clear_content_area:
     inc dh
     loop .clear_lines
     
-    ; Reset cursor to top of content
     mov byte [current_line], 4
     mov ah, 0x02
     mov bh, 0x00
@@ -477,17 +414,14 @@ clear_content_area:
     popa
     ret
 
+; === Calculator ===
 
-; === Calculator Command ===
-; === Calculator Command ===
-; === Calculator Command ===
 calculator:
     call clear_content_area
     mov si, calc_welcome
     call print_string_wrapped
     
 .calc_loop:
-    ; Clear the input buffer
     mov di, calc_buffer
     mov cx, 32
 .clear_buffer:
@@ -495,7 +429,6 @@ calculator:
     inc di
     loop .clear_buffer
     
-    ; Clear the input line (line 6)
     mov ah, 0x02
     mov bh, 0x00
     mov dh, 6
@@ -508,7 +441,6 @@ calculator:
     int 0x10
     loop .clear_input_line
     
-    ; Reprint prompt at the correct position
     mov ah, 0x02
     mov bh, 0x00
     mov dh, 6
@@ -517,7 +449,6 @@ calculator:
     mov si, calc_prompt
     call print_string
     
-    ; Get input
     mov di, calc_buffer
     call read_calc_string
     
@@ -531,40 +462,33 @@ calculator:
     jmp .calc_loop
 
 .calc_done:
-    call clear_content_area  ; Clear calculator UI
+    call clear_content_area
     ret
 
-
-; Special input function for calculator that clears properly
 read_calc_string:
     mov cx, 0
-    mov di, calc_buffer  ; Reset buffer position
-    mov byte [di], 0     ; Clear first byte
-    
-    ; Position cursor after "calc> " prompt
+    mov di, calc_buffer
+    mov byte [di], 0
     mov ah, 0x02
     mov bh, 0x00
     mov dh, 6
-    mov dl, 9      ; "calc> " is 6 chars, so position at 9
+    mov dl, 9
     int 0x10
     
 .input_loop:
     mov ah, 0x00
     int 0x16
     
-    cmp al, 0x0D          ; Enter key
+    cmp al, 0x0D
     je .done
-    
-    cmp al, 0x08          ; Backspace
+    cmp al, 0x08
     je .backspace
     
-    ; Check if we have space (respect right border)
     mov bx, cx
-    add bx, 9              ; Current position (prompt + input)
-    cmp bx, 77             ; Right border - 2
-    jge .input_loop        ; Don't accept more input if at border
+    add bx, 9
+    cmp bx, 77
+    jge .input_loop
     
-    ; Store and echo character
     mov [di], al
     inc di
     inc cx
@@ -574,51 +498,47 @@ read_calc_string:
 
 .backspace:
     test cx, cx
-    jz .input_loop        ; No characters to delete
-    
+    jz .input_loop
     dec di
     dec cx
-    mov byte [di], 0      ; Clear the character in buffer
-    
-    ; Visual backspace
+    mov byte [di], 0
     mov ah, 0x0E
-    mov al, 0x08          ; Backspace
+    mov al, 0x08
     int 0x10
-    mov al, ' '           ; Space to erase
+    mov al, ' '
     int 0x10
-    mov al, 0x08          ; Backspace again
+    mov al, 0x08
     int 0x10
     jmp .input_loop
 
 .done:
-    mov byte [di], 0      ; Null terminate
+    mov byte [di], 0
     ret
 
+; === Calculator Processing ===
 
-; Process basic calculations with multiplication and division
 process_calculation:
     mov si, calc_buffer
     call parse_number
     mov [num1], ax
     
-    ; Skip spaces and find operator
 .find_op:
     lodsb
-    cmp al, ' '          ; Skip spaces
+    cmp al, ' '
     je .find_op
-    cmp al, '+'          ; Addition
+    cmp al, '+'
     je .add
-    cmp al, '-'          ; Subtraction  
+    cmp al, '-'
     je .subtract
-    cmp al, '*'          ; Multiplication
+    cmp al, '*'
     je .multiply
-    cmp al, 'x'          ; Alternative multiplication (lowercase x)
+    cmp al, 'x'
     je .multiply
-    cmp al, 'X'          ; Alternative multiplication (uppercase X)
+    cmp al, 'X'
     je .multiply
-    cmp al, '/'          ; Division
+    cmp al, '/'
     je .divide
-    cmp al, 0            ; Single number
+    cmp al, 0
     je .show_single
     jmp .invalid
 
@@ -636,21 +556,21 @@ process_calculation:
     call parse_number
     mov bx, ax
     mov ax, [num1]
-    mul bx               ; Multiply AX by BX, result in DX:AX
-    mov [num1], ax       ; Store result (for small numbers, AX is enough)
+    mul bx
+    mov [num1], ax
     jmp .show_result
 
 .divide:
     call parse_number
     mov bx, ax
-    cmp bx, 0            ; Check for division by zero
+    cmp bx, 0
     je .division_error
     
     mov ax, [num1]
-    mov dx, 0            ; Clear DX for 16-bit division
-    div bx               ; Divide DX:AX by BX, result in AX, remainder in DX
-    mov [num1], ax       ; Store quotient
-    mov [remainder], dx  ; Store remainder
+    mov dx, 0
+    div bx
+    mov [num1], ax
+    mov [remainder], dx
     jmp .show_division_result
 
 .division_error:
@@ -659,11 +579,9 @@ process_calculation:
     ret
 
 .show_single:
-    ; For single numbers, just show the number
     jmp .show_result
 
 .show_division_result:
-    ; Clear previous result area
     mov cx, 14
     mov dh, 8
 .clear_results:
@@ -682,7 +600,6 @@ process_calculation:
     inc dh
     loop .clear_results
     
-    ; Display division result
     mov ah, 0x02
     mov bh, 0x00
     mov dh, 8
@@ -693,722 +610,661 @@ process_calculation:
     mov ax, [num1]
     call print_number
     
-    ; Check if there's a remainder
     mov ax, [remainder]
     cmp ax, 0
     je .done_division
-    
-    ; Show remainder
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 9
-    mov dl, 3
-    int 0x10
-    mov si, calc_remainder
-    call print_string
-    mov ax, [remainder]
-    call print_number
-    
+
+; Show remainder
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 9
+mov dl, 3
+int 0x10
+mov si, calc_remainder
+call print_string
+mov ax, [remainder]
+call print_number
+
 .done_division:
-    ret
+ret
 
 .show_result:
-    ; Clear previous result area
-    mov cx, 14
-    mov dh, 8
+; Clear previous result area
+mov cx, 14
+mov dh, 8
 .clear_results2:
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dl, 3
-    int 0x10
-    
-    mov bx, 74
+mov ah, 0x02
+mov bh, 0x00
+mov dl, 3
+int 0x10
+
+mov bx, 74
 .clear_line2:
-    mov ah, 0x0E
-    mov al, ' '
-    int 0x10
-    dec bx
-    jnz .clear_line2
-    inc dh
-    loop .clear_results2
-    
-    ; Display result
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 8
-    mov dl, 3
-    int 0x10
-    mov si, calc_result
-    call print_string
-    mov ax, [num1]
-    call print_number
-    ret
+mov ah, 0x0E
+mov al, ' '
+int 0x10
+dec bx
+jnz .clear_line2
+inc dh
+loop .clear_results2
+
+; Display result
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 8
+mov dl, 3
+int 0x10
+mov si, calc_result
+call print_string
+mov ax, [num1]
+call print_number
+ret
 
 .invalid:
-    mov si, calc_invalid
-    call print_string_wrapped
-    ret
+mov si, calc_invalid
+call print_string_wrapped
+ret
 
 ; Parse number from string (SI)
 parse_number:
-    mov word [temp_num], 0
+mov word [temp_num], 0
 .skip_spaces:
-    mov al, [si]
-    cmp al, ' '
-    jne .parse_loop
-    inc si
-    jmp .skip_spaces
+mov al, [si]
+cmp al, ' '
+jne .parse_loop
+inc si
+jmp .skip_spaces
 .parse_loop:
-    lodsb
-    test al, al
-    jz .parse_done
-    cmp al, ' '          ; Stop at space
-    je .parse_done
-    cmp al, '0'
-    jb .parse_done
-    cmp al, '9'
-    ja .parse_done
-    sub al, '0'
-    mov bx, ax
-    mov ax, [temp_num]
-    mov cx, 10
-    mul cx
-    add ax, bx
-    mov [temp_num], ax
-    jmp .parse_loop
+lodsb
+test al, al
+jz .parse_done
+cmp al, ' '
+je .parse_done
+cmp al, '0'
+jb .parse_done
+cmp al, '9'
+ja .parse_done
+sub al, '0'
+mov bx, ax
+mov ax, [temp_num]
+mov cx, 10
+mul cx
+add ax, bx
+mov [temp_num], ax
+jmp .parse_loop
 .parse_done:
-    mov ax, [temp_num]
-    ret
+mov ax, [temp_num]
+ret
 
 ; Print number in AX
 print_number:
-    pusha
-    mov cx, 0
-    mov bx, 10
+pusha
+mov cx, 0
+mov bx, 10
 .convert_loop:
-    mov dx, 0
-    div bx
-    push dx
-    inc cx
-    test ax, ax
-    jnz .convert_loop
+mov dx, 0
+div bx
+push dx
+inc cx
+test ax, ax
+jnz .convert_loop
 .print_loop:
-    pop ax
-    add al, '0'
-    mov ah, 0x0E
-    int 0x10
-    loop .print_loop
-    popa
-    ret
+pop ax
+add al, '0'
+mov ah, 0x0E
+int 0x10
+loop .print_loop
+popa
+ret
 
-
-
-
-
-; === SIMPLE TYPING GAME ===
+; SIMPLE TYPING GAME
 type_game_handler:
-    call typing_game
-    jmp shell_loop.prompt
+call typing_game
+jmp shell_loop.prompt
 
 typing_game:
-    call clear_content_area
-    
-    ; Show instructions
-    mov si, type_instructions
-    call print_string_wrapped
-    
-    ; Wait for key to start
-    mov ah, 0x00
-    int 0x16
-    
-    call clear_content_area
-    
-    ; Initialize game
-    mov word [type_score], 0
-    mov byte [type_lives], 3
-    mov byte [current_word_pos], 0
-    
-    ; Game loop
+call clear_content_area
+
+; Show instructions
+mov si, type_instructions
+call print_string_wrapped
+
+; Wait for key to start
+mov ah, 0x00
+int 0x16
+
+call clear_content_area
+
+; Initialize game
+mov word [type_score], 0
+mov byte [type_lives], 3
+mov byte [current_word_pos], 0
+
+; Game loop
 type_main_loop:
-    call type_display_game
-    call type_get_input
-    
-    ; Check if game over
-    cmp byte [type_lives], 0
-    jle type_game_over
-    
-    jmp type_main_loop
+call type_display_game
+call type_get_input
+
+; Check if game over
+cmp byte [type_lives], 0
+jle type_game_over
+
+jmp type_main_loop
 
 type_game_over:
-    call clear_content_area
-    mov si, type_game_over_msg
-    call print_string_wrapped
-    
-    ; Display final score
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 8
-    mov dl, 3
-    int 0x10
-    
-    mov si, type_final_score
-    call print_string
-    mov ax, [type_score]
-    call print_number
-    
-    mov ah, 0x00
-    int 0x16
-    ret
+call clear_content_area
+mov si, type_game_over_msg
+call print_string_wrapped
+
+; Display final score
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 8
+mov dl, 3
+int 0x10
+
+mov si, type_final_score
+call print_string
+mov ax, [type_score]
+call print_number
+
+mov ah, 0x00
+int 0x16
+ret
 
 ; Display typing game screen
 type_display_game:
-    pusha
-    
-    ; Clear game area
-    mov cx, 12
-    mov dh, 7
+pusha
+
+; Clear game area
+mov cx, 12
+mov dh, 7
 type_clear_area:
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dl, 10
-    int 0x10
-    
-    mov bx, 61
+mov ah, 0x02
+mov bh, 0x00
+mov dl, 10
+int 0x10
+
+mov bx, 61
 type_clear_line:
-    mov ah, 0x0E
-    mov al, ' '
-    int 0x10
-    dec bx
-    jnz type_clear_line
-    inc dh
-    loop type_clear_area
-    
-    ; Display score and lives
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 7
-    mov dl, 10
-    int 0x10
-    
-    mov si, type_score_msg
-    call print_string
-    mov ax, [type_score]
-    call print_number
-    
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 7
-    mov dl, 40
-    int 0x10
-    
-    mov si, type_lives_msg
-    call print_string
-    mov al, [type_lives]
-    add al, '0'
-    mov ah, 0x0E
-    int 0x10
-    
-    ; Display current word
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 10
-    mov dl, 25
-    int 0x10
-    
-    ; Get current word
-    mov si, type_words
-    mov al, [current_word_pos]
-    mov bl, 6
-    mul bl
-    add si, ax
-    call print_string
-    
-    ; Display input prompt
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 12
-    mov dl, 10
-    int 0x10
-    
-    mov si, type_prompt
-    call print_string
-    
-    popa
-    ret
+mov ah, 0x0E
+mov al, ' '
+int 0x10
+dec bx
+jnz type_clear_line
+inc dh
+loop type_clear_area
+
+; Display score and lives
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 7
+mov dl, 10
+int 0x10
+
+mov si, type_score_msg
+call print_string
+mov ax, [type_score]
+call print_number
+
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 7
+mov dl, 40
+int 0x10
+
+mov si, type_lives_msg
+call print_string
+mov al, [type_lives]
+add al, '0'
+mov ah, 0x0E
+int 0x10
+
+; Display current word
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 10
+mov dl, 25
+int 0x10
+
+; Get current word
+mov si, type_words
+mov al, [current_word_pos]
+mov bl, 6
+mul bl
+add si, ax
+call print_string
+
+; Display input prompt
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 12
+mov dl, 10
+int 0x10
+
+mov si, type_prompt
+call print_string
+
+popa
+ret
 
 ; Get typing input
 type_get_input:
-    pusha
-    
-    ; Position cursor after prompt
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 12
-    mov dl, 17
-    int 0x10
-    
-    ; Read input
-    mov di, type_buffer
-    mov cx, 0
+pusha
+
+; Position cursor after prompt
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 12
+mov dl, 17
+int 0x10
+
+; Read input
+mov di, type_buffer
+mov cx, 0
 type_input_main:
-    mov ah, 0x00
-    int 0x16
-    
-    cmp al, 0x0D  ; Enter
-    je type_check_input
-    
-    cmp al, 0x08  ; Backspace
-    je type_handle_backspace
-    
-    ; Store and echo character
-    cmp cx, 15
-    jge type_input_main
-    
-    mov [di], al
-    inc di
-    inc cx
-    mov ah, 0x0E
-    int 0x10
-    jmp type_input_main
+mov ah, 0x00
+int 0x16
+
+cmp al, 0x0D
+je type_check_input
+
+cmp al, 0x08
+je type_handle_backspace
+
+cmp cx, 15
+jge type_input_main
+
+mov [di], al
+inc di
+inc cx
+mov ah, 0x0E
+int 0x10
+jmp type_input_main
 
 type_handle_backspace:
-    cmp cx, 0
-    je type_input_main
-    dec di
-    dec cx
-    mov byte [di], 0
-    mov ah, 0x0E
-    mov al, 0x08
-    int 0x10
-    mov al, ' '
-    int 0x10
-    mov al, 0x08
-    int 0x10
-    jmp type_input_main
+cmp cx, 0
+je type_input_main
+dec di
+dec cx
+mov byte [di], 0
+mov ah, 0x0E
+mov al, 0x08
+int 0x10
+mov al, ' '
+int 0x10
+mov al, 0x08
+int 0x10
+jmp type_input_main
 
 type_check_input:
-    mov byte [di], 0  ; Null terminate
-    
-    ; Compare with current word
-    mov si, type_words
-    mov al, [current_word_pos]
-    mov bl, 6
-    mul bl
-    add si, ax
-    
-    mov di, type_buffer
-    call compare_string
-    cmp ax, 1
-    je type_correct_answer
-    
-    ; Wrong word
-    dec byte [type_lives]
-    jmp type_next_round
+mov byte [di], 0
+
+; Compare with current word
+mov si, type_words
+mov al, [current_word_pos]
+mov bl, 6
+mul bl
+add si, ax
+
+mov di, type_buffer
+call compare_string
+cmp ax, 1
+je type_correct_answer
+
+; Wrong word
+dec byte [type_lives]
+jmp type_next_round
 
 type_correct_answer:
-    ; Correct word - add score
-    add word [type_score], 10
+; Correct word - add score
+add word [type_score], 10
 
 type_next_round:
-    ; Move to next word
-    inc byte [current_word_pos]
-    cmp byte [current_word_pos], 9  ; 9 words total (0-8)
-    jl type_cleanup
-    mov byte [current_word_pos], 0  ; Wrap around
+; Move to next word
+inc byte [current_word_pos]
+cmp byte [current_word_pos], 9
+jl type_cleanup
+mov byte [current_word_pos], 0
 
 type_cleanup:
-    ; Clear input buffer
-    mov di, type_buffer
-    mov cx, 16
+; Clear input buffer
+mov di, type_buffer
+mov cx, 16
 type_clear_buf:
-    mov byte [di], 0
-    inc di
-    loop type_clear_buf
-    
-    popa
-    ret
+mov byte [di], 0
+inc di
+loop type_clear_buf
 
+popa
+ret
 
-
-
-
-
-; === System Info Command ===
+; SYSTEM INFO COMMAND
 sysinfo_command:
-    call clear_content_area
-    mov si, sysinfo_msg
-    call print_string_wrapped
-    
-    ; Try to get actual memory size (optional enhancement)
-    call detect_memory
-    ret
+call clear_content_area
+mov si, sysinfo_msg
+call print_string_wrapped
+call detect_memory
+ret
 
-; === Disk Info Command ===
+; DISK INFO COMMAND
 diskinfo_command:
-    call clear_content_area
-    mov si, diskinfo_msg
-    call print_string_wrapped
-    
-    ; Try to detect actual disk parameters (optional)
-    call detect_disk
-    ret
+call clear_content_area
+mov si, diskinfo_msg
+call print_string_wrapped
+call detect_disk
+ret
 
-; Optional: Try to detect actual memory
+; Optional: Detect memory
 detect_memory:
-    ; Use BIOS interrupt to get memory size
-    mov ah, 0x88
-    int 0x15
-    jc .memory_done
-    
-    ; AX contains extended memory in KB (if any)
-    ; For now just display a generic message
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 10
-    mov dl, 3
-    int 0x10
-    
-    mov si, memory_detected_msg
-    call print_string
-    call print_number
-    mov si, kb_msg
-    call print_string
-    
+mov ah, 0x88
+int 0x15
+jc .memory_done
+
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 10
+mov dl, 3
+int 0x10
+
+mov si, memory_detected_msg
+call print_string
+call print_number
+mov si, kb_msg
+call print_string
+
 .memory_done:
-    ret
+ret
 
-; Optional: Try to detect disk parameters  
+; Optional: Detect disk parameters
 detect_disk:
-    ; Get disk parameters for drive 0 (A:)
-    mov ah, 0x08
-    mov dl, 0x00  ; Drive A:
-    int 0x13
-    jc .disk_done
-    
-    ; DH = max head number, CH = max cylinder number (low 8 bits)
-    ; CL = sectors per track (bits 0-5), max cylinder (bits 6-7)
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 10
-    mov dl, 3
-    int 0x10
-    
-    mov si, disk_params_msg
-    call print_string
-    
+mov ah, 0x08
+mov dl, 0x00
+int 0x13
+jc .disk_done
+
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 10
+mov dl, 3
+int 0x10
+
+mov si, disk_params_msg
+call print_string
+
 .disk_done:
-    ret
+ret
 
-
-
-
-
-
-; === Shell Loop ===
+; SHELL LOOP
 shell_loop:
-    ; Position cursor for input (fixed position)
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 22
-    mov dl, 3
-    int 0x10
-    
-    ; Clear input area
-    mov cx, 74
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 22
+mov dl, 3
+int 0x10
+
+mov cx, 74
 .clear_input:
-    mov ah, 0x0E
-    mov al, ' '
-    int 0x10
-    loop .clear_input
-    
-    ; Reprint prompt
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 22
-    mov dl, 3
-    int 0x10
-    mov ah, 0x0E
-    mov al, '>'
-    int 0x10
-    mov al, ' '
-    int 0x10
-    
-    ; Read input
-    mov di, buffer
-    call read_string
-    
-    ; Reset to content area for command output
-    mov byte [current_line], 4
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 4
-    mov dl, 3
-    int 0x10
-    
-    ; Process commands
-    mov si, buffer
-    cmp byte [si], 0      ; Empty command
-    je .empty
-    
-    ; Check for "help" command
-    mov di, cmd_help
-    call compare_string
-    je .help
-    
-    ; Check for "clear" command  
-    mov di, cmd_clear
-    call compare_string
-    je .clear
-    
-    ; Check for "info" command
-    mov di, cmd_info
-    call compare_string
-    je .info
-    
-    ; about command
-    mov di, cmd_about
-    call compare_string
-    je .about
-    
-    ; time command
-    mov di, cmd_time
-    call compare_string
-    je .time
-    
-    ; Check for "reboot" command
-    mov di, cmd_reboot
-    call compare_string
-    je .reboot
+mov ah, 0x0E
+mov al, ' '
+int 0x10
+loop .clear_input
 
-    ; calculator check
-    mov di, cmd_calc
-    call compare_string
-    cmp ax, 1
-    je .calc
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 22
+mov dl, 3
+int 0x10
+mov ah, 0x0E
+mov al, '>'
+int 0x10
+mov al, ' '
+int 0x10
 
-    ; snake game check
-    mov di, cmd_snake
-    call compare_string
-    cmp ax, 1
-    je .snake
+mov di, buffer
+call read_string
 
-    ; pong game check
-    mov di, cmd_pong
-    call compare_string
-    cmp ax, 1
-    je .pong
+mov byte [current_line], 4
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 4
+mov dl, 3
+int 0x10
 
+mov si, buffer
+cmp byte [si], 0
+je .empty
 
-    ; gallery command check
-    mov di, cmd_gallery
-    call compare_string
-    cmp ax, 1
-    je .gallery
+mov di, cmd_help
+call compare_string
+je .help
 
-    ; cat command check
-    mov di, cmd_cat
-    call compare_string
-    cmp ax, 1
-    je .cat
+mov di, cmd_clear
+call compare_string
+je .clear
 
-    ; ship command check
-    mov di, cmd_ship
-    call compare_string
-    cmp ax, 1
-    je .ship
+mov di, cmd_info
+call compare_string
+je .info
 
-    ; tree command check
-    mov di, cmd_tree
-    call compare_string
-    cmp ax, 1
-    je .tree
+mov di, cmd_about
+call compare_string
+je .about
 
-    ; chud command check
-    mov di, cmd_chud
-    call compare_string
-    cmp ax, 1
-    je .chud
+mov di, cmd_time
+call compare_string
+je .time
 
+mov di, cmd_reboot
+call compare_string
+je .reboot
 
-    ; mem command check
-    mov di, cmd_mem
-    call compare_string
-    cmp ax, 1
-    je .mem
+mov di, cmd_calc
+call compare_string
+cmp ax, 1
+je .calc
 
-    ; invaders command check
-    mov di, cmd_invaders
-    call compare_string
-    cmp ax, 1
-    je .invaders
+mov di, cmd_snake
+call compare_string
+cmp ax, 1
+je .snake
 
-    ; notepad command check
-    mov di, cmd_notepad
-    call compare_string
-    cmp ax, 1
-    je .notepad
+mov di, cmd_pong
+call compare_string
+cmp ax, 1
+je .pong
 
-    ; type command check
-    mov di, cmd_type
-    call compare_string
-    cmp ax, 1
-    je type_game_handler
+mov di, cmd_gallery
+call compare_string
+cmp ax, 1
+je .gallery
 
-    ; sysinfo command check
-    mov di, cmd_sysinfo
-    call compare_string
-    cmp ax, 1
-    je .sysinfo
+mov di, cmd_cat
+call compare_string
+cmp ax, 1
+je .cat
 
-    ; diskinfo command check  
-    mov di, cmd_diskinfo
-    call compare_string
-    cmp ax, 1
-    je .diskinfo
-    
-    ; Unknown command
-    call clear_content_area
-    mov si, unknown_msg
-    call print_string_wrapped
-    jmp .prompt
-    
+mov di, cmd_ship
+call compare_string
+cmp ax, 1
+je .ship
+
+mov di, cmd_tree
+call compare_string
+cmp ax, 1
+je .tree
+
+mov di, cmd_chud
+call compare_string
+cmp ax, 1
+je .chud
+
+mov di, cmd_mem
+call compare_string
+cmp ax, 1
+je .mem
+
+mov di, cmd_invaders
+call compare_string
+cmp ax, 1
+je .invaders
+
+mov di, cmd_notepad
+call compare_string
+cmp ax, 1
+je .notepad
+
+mov di, cmd_type
+call compare_string
+cmp ax, 1
+je type_game_handler
+
+mov di, cmd_sysinfo
+call compare_string
+cmp ax, 1
+je .sysinfo
+
+mov di, cmd_diskinfo
+call compare_string
+cmp ax, 1
+je .diskinfo
+
+call clear_content_area
+mov si, unknown_msg
+call print_string_wrapped
+jmp .prompt
+
 .help:
-    call clear_content_area
-    mov si, help_msg
-    call print_string_wrapped
-    jmp .prompt
+call clear_content_area
+mov si, help_msg
+call print_string_wrapped
+jmp .prompt
 
 .clear:
-    ; Clear content area but show desktop
-    call clear_content_area
-    
-    ; Reprint desktop welcome message
-    mov byte [current_line], 4
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 4
-    mov dl, 3
-    int 0x10
-    mov si, welcome_msg
-    call print_string_wrapped
-    
-    jmp .prompt
+call clear_content_area
+mov byte [current_line], 4
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 4
+mov dl, 3
+int 0x10
+mov si, welcome_msg
+call print_string_wrapped
+jmp .prompt
+
 .clear_content:
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dl, 3
-    int 0x10
-    
-    ; Clear this line
-    mov bx, 74
+mov ah, 0x02
+mov bh, 0x00
+mov dl, 3
+int 0x10
+
+mov bx, 74
 .clear_line:
-    mov ah, 0x0E
-    mov al, ' '
-    int 0x10
-    dec bx
-    jnz .clear_line
-    
-    inc dh
-    loop .clear_content
-    
-    ; Reset cursor to top of content
-    mov byte [current_line], 4
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dh, 4
-    mov dl, 3
-    int 0x10
-    jmp .prompt
+mov ah, 0x0E
+mov al, ' '
+int 0x10
+dec bx
+jnz .clear_line
+
+inc dh
+loop .clear_content
+
+mov byte [current_line], 4
+mov ah, 0x02
+mov bh, 0x00
+mov dh, 4
+mov dl, 3
+int 0x10
+jmp .prompt
 
 .info:
-    call clear_content_area
-    mov si, info_msg
-    call print_string_wrapped
-    jmp .prompt
+call clear_content_area
+mov si, info_msg
+call print_string_wrapped
+jmp .prompt
 
 .about:
-    call clear_content_area
-    mov si, about_msg
-    call print_string_wrapped
-    jmp .prompt
+call clear_content_area
+mov si, about_msg
+call print_string_wrapped
+jmp .prompt
 
 .time:
-    call clear_content_area
-    call clear_content_area
-    call show_time
-    jmp .prompt
+call clear_content_area
+call clear_content_area
+call show_time
+jmp .prompt
 
 .reboot:
-    call clear_content_area
-    call reboot_system
-    ; Reboot failed code
-    mov si, reboot_failed_msg
-    call print_string_wrapped
-    jmp .prompt
+call clear_content_area
+call reboot_system
+mov si, reboot_failed_msg
+call print_string_wrapped
+jmp .prompt
 
 .calc:
-    call calculator
-    jmp .prompt
+call calculator
+jmp .prompt
 
 .snake:
-    call snake_game
-    jmp .prompt
+call snake_game
+jmp .prompt
 
 .pong:
-    call pong_game
-    jmp .prompt
+call pong_game
+jmp .prompt
 
 .gallery:
-    call clear_content_area
-    call show_gallery
-    jmp .prompt
+call clear_content_area
+call show_gallery
+jmp .prompt
 
 .cat:
-    call clear_content_area
-    call show_cat
-    jmp .prompt
+call clear_content_area
+call show_cat
+jmp .prompt
 
 .ship:
-    call clear_content_area
-    call show_ship
-    jmp .prompt
+call clear_content_area
+call show_ship
+jmp .prompt
 
 .tree:
-    call clear_content_area
-    call show_tree
-    jmp .prompt
+call clear_content_area
+call show_tree
+jmp .prompt
 
 .chud:
-    call clear_content_area
-    call show_chud
-    jmp .prompt
+call clear_content_area
+call show_chud
+jmp .prompt
 
 .mem:
-    call clear_content_area
-    call show_memory_info
-    jmp .prompt
+call clear_content_area
+call show_memory_info
+jmp .prompt
 
 .invaders:
-    call space_invaders_game
-    jmp .prompt
+call space_invaders_game
+jmp .prompt
 
 .notepad:
-    call notepad_app
-    jmp .prompt
+call notepad_app
+jmp .prompt
 
 .sysinfo:
-    call sysinfo_command
-    jmp .prompt
+call sysinfo_command
+jmp .prompt
 
 .diskinfo:
-    call diskinfo_command
-    jmp .prompt
+call diskinfo_command
+jmp .prompt
 
 .empty:
 .prompt:
-    ; Update status bar
-    call update_status
-    jmp shell_loop
+call update_status
+jmp shell_loop
+
 
 ; === Simple input function ===
 read_string:
@@ -2431,7 +2287,7 @@ process_pong_input:
 
 ; === Gallery Functions ===
 
-; Show gallery with miniaturized ASCII art
+
 show_gallery:
     pusha
     
@@ -2439,14 +2295,14 @@ show_gallery:
     mov si, gallery_title
     call print_string_wrapped
     
-    ; Add some spacing
+
     mov ah, 0x0E
     mov al, 13
     int 0x10
     mov al, 10
     int 0x10
     
-    ; Position for first column (Cat)
+
     mov byte [current_line], 6
     mov ah, 0x02
     mov bh, 0x00
@@ -2456,7 +2312,7 @@ show_gallery:
     mov si, mini_cat_art
     call print_string_wrapped
     
-    ; Position for second column (Ship)
+
     mov byte [current_line], 6
     mov ah, 0x02
     mov bh, 0x00
@@ -2466,7 +2322,7 @@ show_gallery:
     mov si, mini_ship_art
     call print_string_wrapped
     
-    ; Position for third column (Tree)
+
     mov byte [current_line], 6
     mov ah, 0x02
     mov bh, 0x00
@@ -2476,7 +2332,7 @@ show_gallery:
     mov si, mini_tree_art
     call print_string_wrapped
     
-    ; Position for fourth column (Chud)
+
     mov byte [current_line], 6
     mov ah, 0x02
     mov bh, 0x00
@@ -2500,7 +2356,7 @@ show_gallery:
     popa
     ret
 
-; Show full-size cat ASCII art
+
 show_cat:
     pusha
     mov si, cat_art
@@ -2508,7 +2364,7 @@ show_cat:
     popa
     ret
 
-; Show full-size ship ASCII art  
+
 show_ship:
     pusha
     mov si, ship_art
@@ -2516,7 +2372,7 @@ show_ship:
     popa
     ret
 
-; Show full-size tree ASCII art
+
 show_tree:
     pusha
     mov si, tree_art
@@ -2524,7 +2380,7 @@ show_tree:
     popa
     ret
 
-; Show full-size chud ASCII art
+
 show_chud:
     pusha
     mov si, chud_art
@@ -2560,7 +2416,7 @@ space_invaders_game:
     
     ; Game loop
 .game_loop:
-    ; Game speed delay
+
     mov cx, 0x4000
 .delay:
     push cx
@@ -2571,12 +2427,12 @@ space_invaders_game:
     pop cx
     loop .delay
     
-    ; Check for key press without waiting
+
     mov ah, 0x01
     int 0x16
     jz .no_key
     
-    ; Get key and process
+
     mov ah, 0x00
     int 0x16
     call process_invaders_input
@@ -2584,16 +2440,16 @@ space_invaders_game:
     je .game_over
     
 .no_key:
-    ; Update game state
+
     call update_invaders
     cmp byte [game_active], 0
     je .game_over
     
-    ; Check win condition
+
     cmp byte [aliens_remaining], 0
     je .win
     
-    ; Redraw
+
     call clear_invaders_area
     call draw_player
     call draw_aliens
@@ -2603,41 +2459,41 @@ space_invaders_game:
     jmp .game_loop
 
 .game_over:
-    ; Clear the entire content area
+
     call clear_content_area
     
-    ; Show game over message
+
     mov si, invaders_game_over
     call print_string_wrapped
     
-    ; Wait for any key
+
     mov ah, 0x00
     int 0x16
     
-    ; Return to shell
+
     ret
 
 .win:
-    ; Clear the entire content area
+
     call clear_content_area
     
-    ; Show win message
+
     mov si, invaders_win
     call print_string_wrapped
     
-    ; Wait for any key
+
     mov ah, 0x00
     int 0x16
     
-    ; Return to shell
+
     ret
 
 ; Draw space invaders border
 draw_invaders_border:
     pusha
-    ; Draw border around play area (lines 6-20, columns 15-65)
+
     
-    ; Top border (line 6, columns 15-65)
+
     mov dh, 6
     mov dl, 15
     mov cx, 51
@@ -2651,7 +2507,7 @@ draw_invaders_border:
     inc dl
     loop .top_border
     
-    ; Bottom border (line 20, columns 15-65)
+
     mov dh, 20
     mov dl, 15
     mov cx, 51
@@ -2664,8 +2520,8 @@ draw_invaders_border:
     int 0x10
     inc dl
     loop .bottom_border
-    
-    ; Left border (lines 7-19, column 15)
+
+
     mov dh, 7
     mov dl, 15
     mov cx, 13
@@ -2674,12 +2530,12 @@ draw_invaders_border:
     mov bh, 0x00
     int 0x10
     mov ah, 0x0E
-    mov al, 0xB3  ; Vertical line
+    mov al, 0xB3  
     int 0x10
     inc dh
     loop .left_border
     
-    ; Right border (lines 7-19, column 65)
+
     mov dh, 7
     mov dl, 65
     mov cx, 13
@@ -2688,12 +2544,12 @@ draw_invaders_border:
     mov bh, 0x00
     int 0x10
     mov ah, 0x0E
-    mov al, 0xB3  ; Vertical line
+    mov al, 0xB3  
     int 0x10
     inc dh
     loop .right_border
     
-    ; Corners
+
     mov ah, 0x02
     mov bh, 0x00
     mov dh, 6
@@ -2765,27 +2621,27 @@ clear_invaders_area:
     popa
     ret
 
-; Initialize space invaders game
+
 init_invaders:
-    ; Initialize player
-    mov byte [player_x], 35  ; Center
+
+    mov byte [player_x], 35  
     
-; Initialize aliens (5 rows x 6 columns)
+
 mov cx, 30
 mov si, 0
-mov bl, 18  ; Starting X position
-mov bh, 1   ; CHANGED: Starting Y position from 8 to 6 (moved up)
+mov bl, 18  
+mov bh, 1  
 .init_aliens:
     mov [alien_x + si], bl
     mov [alien_y + si], bh
     mov byte [alien_active + si], 1
     
-    add bl, 8   ; Space between aliens
+    add bl, 8   
     inc si
-    cmp si, 6   ; First row done?
+    cmp si, 6   
     jl .continue_row
-    mov bl, 18  ; Reset X for next row
-    add bh, 2   ; Move to next row
+    mov bl, 18  
+    add bh, 2   
     mov si, 0
 .continue_row:
     loop .init_aliens
@@ -2801,27 +2657,27 @@ mov bh, 1   ; CHANGED: Starting Y position from 8 to 6 (moved up)
     
     ret
 
-; Update space invaders game state
+
 update_invaders:
-; Move aliens - SLOWER
+
 dec byte [alien_speed]
 jnz .skip_alien_move
 
-; Reset speed counter - SLOWER MOVEMENT
+
 mov byte [alien_speed], 25
 
-; Move all active aliens
+
 mov cx, 30
 mov si, 0
 .move_aliens:
     cmp byte [alien_active + si], 0
     je .skip_alien
     
-    ; Move alien horizontally
+
     mov al, [alien_direction]
     add [alien_x + si], al
     
-    ; Check if aliens hit wall (with boundary protection)
+
     cmp byte [alien_x + si], 16
     jle .change_direction
     cmp byte [alien_x + si], 63
@@ -2833,7 +2689,6 @@ mov si, 0
     jmp .skip_alien_move
 
 .change_direction:
-    ; Change direction and move down
     neg byte [alien_direction]
     mov cx, 30
     mov si, 0
@@ -2841,11 +2696,11 @@ mov si, 0
     cmp byte [alien_active + si], 0
     je .skip_move_down
     
-    ; Ensure aliens don't go below bottom boundary
+
     inc byte [alien_y + si]
     cmp byte [alien_y + si], 19
     jl .not_at_bottom
-    mov byte [alien_y + si], 18  ; Keep at max position
+    mov byte [alien_y + si], 18 
     
 .not_at_bottom:
     ; Check if aliens reached player level (game over)
@@ -2857,15 +2712,15 @@ mov si, 0
     loop .move_down
 
 .skip_alien_move:
-; Move player bullet
+
 cmp byte [player_bullet_active], 1
 jne .no_player_bullet
 
 dec byte [player_bullet_y]
-cmp byte [player_bullet_y], 7    ; Stop at top border (line 7)
+cmp byte [player_bullet_y], 7    
 jle .bullet_off_screen
 
-; Check bullet collision with aliens
+
 call check_bullet_collision
 jmp .no_player_bullet
 
@@ -2873,18 +2728,17 @@ jmp .no_player_bullet
 mov byte [player_bullet_active], 0
 
 .no_player_bullet:
-; Alien shooting (random)
 call alien_shoot
 
-; Move alien bullet
+
 cmp byte [alien_bullet_active], 1
 jne .no_alien_bullet
 
 inc byte [alien_bullet_y]
-cmp byte [alien_bullet_y], 19    ; Stop at bottom border (line 19)
+cmp byte [alien_bullet_y], 19   
 jge .alien_bullet_off_screen
 
-; Check alien bullet collision with player
+
 mov al, [alien_bullet_x]
 cmp al, [player_x]
 jne .no_alien_bullet
@@ -2892,7 +2746,7 @@ mov al, [alien_bullet_y]
 cmp al, 18
 jne .no_alien_bullet
 
-; Player hit!
+
 mov byte [game_active], 0
 jmp .alien_bullet_off_screen
 
@@ -2907,7 +2761,7 @@ mov byte [alien_bullet_active], 0
     mov byte [game_active], 0
     ret
 
-; Check player bullet collision with aliens
+
 check_bullet_collision:
     mov cx, 30
     mov si, 0
@@ -2923,7 +2777,7 @@ check_bullet_collision:
     cmp al, [alien_y + si]
     jne .next_alien
     
-    ; Hit! Destroy alien
+
     mov byte [alien_active + si], 0
     mov byte [player_bullet_active], 0
     dec byte [aliens_remaining]
@@ -2940,15 +2794,15 @@ alien_shoot:
     cmp byte [alien_bullet_active], 1
     je .done_shoot
     
-    ; Random chance to shoot - REDUCED FREQUENCY
+
     mov ah, 0x00
     int 0x1A
-    test dl, 0x1F  ; Changed from 0x0F to 0x1F (1 in 32 chance)
+    test dl, 0x1F  
     jnz .done_shoot
 .find_shooter:
     mov ah, 0x00
     int 0x1A
-    and dx, 31  ; 0-31 (some may be inactive)
+    and dx, 31  
     cmp dx, 30
     jge .find_shooter
     
@@ -2956,7 +2810,7 @@ alien_shoot:
     cmp byte [alien_active + si], 0
     je .find_shooter
     
-    ; Shoot from this alien
+
     mov al, [alien_x + si]
     mov [alien_bullet_x], al
     mov al, [alien_y + si]
@@ -2970,7 +2824,7 @@ alien_shoot:
 ; Draw player
 draw_player:
     pusha
-    mov dh, 18  ; Bottom row
+    mov dh, 18 
     mov dl, [player_x]
     
     mov ah, 0x02
@@ -2978,7 +2832,7 @@ draw_player:
     int 0x10
     
     mov ah, 0x0E
-    mov al, '^'  ; Player ship
+    mov al, '^' 
     int 0x10
     popa
     ret
@@ -2995,14 +2849,14 @@ draw_aliens:
     mov dh, [alien_y + si]
     mov dl, [alien_x + si]
     
-    ; Check if alien is within game area boundaries
-    cmp dl, 16       ; Left border
+
+    cmp dl, 16       
     jl .skip_alien
-    cmp dl, 63       ; Right border  
+    cmp dl, 63  
     jg .skip_alien
-    cmp dh, 7        ; Top border
+    cmp dh, 7     
     jl .skip_alien
-    cmp dh, 19       ; Bottom border
+    cmp dh, 19  
     jg .skip_alien
     
     mov ah, 0x02
@@ -3010,7 +2864,7 @@ draw_aliens:
     int 0x10
     
     mov ah, 0x0E
-    mov al, 'M'  ; Alien
+    mov al, 'M'  
     int 0x10
 
 .skip_alien:
@@ -3023,14 +2877,14 @@ draw_aliens:
 draw_bullets:
     pusha
     
-    ; Draw player bullet (only if within game area)
+
     cmp byte [player_bullet_active], 1
     jne .no_player_bullet
     
     mov dh, [player_bullet_y]
     mov dl, [player_bullet_x]
     
-    ; Check if bullet is within game area
+
     cmp dh, 7
     jl .no_player_bullet
     cmp dh, 19
@@ -3041,18 +2895,18 @@ draw_bullets:
     int 0x10
     
     mov ah, 0x0E
-    mov al, '|'  ; Player bullet
+    mov al, '|' 
     int 0x10
 
 .no_player_bullet:
-    ; Draw alien bullet (only if within game area)
+
     cmp byte [alien_bullet_active], 1
     jne .no_alien_bullet
     
     mov dh, [alien_bullet_y]
     mov dl, [alien_bullet_x]
     
-    ; Check if bullet is within game area
+
     cmp dh, 7
     jl .no_alien_bullet
     cmp dh, 19
@@ -3063,14 +2917,14 @@ draw_bullets:
     int 0x10
     
     mov ah, 0x0E
-    mov al, '.'  ; Alien bullet
+    mov al, '.'  
     int 0x10
 
 .no_alien_bullet:
     popa
     ret
 
-; Draw invaders info (score, aliens left)
+
 draw_invaders_info:
     pusha
     
@@ -3104,33 +2958,33 @@ draw_invaders_info:
 
 ; Process space invaders input
 process_invaders_input:
-    cmp al, 'a'   ; A key - move left
+    cmp al, 'a'   
     je .move_left
-    cmp al, 'd'   ; D key - move right
+    cmp al, 'd'   
     je .move_right
-    cmp al, ' '   ; Space - shoot
+    cmp al, ' '  
     je .shoot
-    cmp al, 'q'   ; Q key - quit
+    cmp al, 'q'   
     je .quit
     ret
 
 .move_left:
     dec byte [player_x]
-    cmp byte [player_x], 16    ; Left border
+    cmp byte [player_x], 16   
     jge .done
     mov byte [player_x], 16
     jmp .done
 
 .move_right:
     inc byte [player_x]
-    cmp byte [player_x], 63    ; Right border  
+    cmp byte [player_x], 63 
     jle .done
     mov byte [player_x], 63
     jmp .done
 
 .shoot:
     cmp byte [player_bullet_active], 1
-    je .done  ; Already have active bullet
+    je .done  
     
     ; Create new bullet at player position
     mov al, [player_x]
@@ -3150,62 +3004,61 @@ process_invaders_input:
 show_memory_info:
     pusha
     
-    ; Display title
+
     mov si, mem_title
     call print_string_wrapped
     
-    ; Display kernel information
+
     mov si, mem_kernel
     call print_string_wrapped
     
     mov si, mem_kernel_size
     call print_string_wrapped
     
-    ; Display total memory
+
     mov si, mem_total
     call print_string_wrapped
     
     mov si, mem_available
     call print_string_wrapped
     
-    ; Add some spacing
+
     mov ah, 0x0E
     mov al, 13
     int 0x10
     mov al, 10
     int 0x10
     
-    ; Display memory layout
+
     mov si, mem_layout
     call print_string_wrapped
     
-    ; Try to get actual memory size from BIOS (optional enhancement)
+
     call try_detect_memory
     
     popa
     ret
 
-; Optional: Try to detect actual memory size
+
 try_detect_memory:
-    ; Use BIOS interrupt to get memory size
+
     mov ah, 0x88
     int 0x15
     jc .memory_error
     
-    ; AX contains number of contiguous KB starting at 0x100000 (if any)
-    ; For conventional memory, we can use a different method
+
     
     mov si, detected_mem_msg
     call print_string_wrapped
     
-    ; Convert AX to decimal and display
+
     call print_number
     mov si, kb_msg
     call print_string_wrapped
     ret
     
 .memory_error:
-    ; BIOS memory detection not available
+
     ret
 
 detected_mem_msg db "Extended memory detected: ", 0
@@ -3225,35 +3078,35 @@ notepad_app:
     mov si, notepad_instructions
     call print_string_wrapped
     
-    ; Wait for key press to start
+
     mov ah, 0x00
     int 0x16
     
-    ; Clear everything and set up notepad
+
     call clear_content_area
     call draw_notepad_border
     
-    ; Initialize notepad
+
     call init_notepad
     
-    ; Main notepad loop
+
 .notepad_loop:
-    ; Draw current content
+
     call draw_notepad_content
     
-    ; Position cursor
+
     call position_notepad_cursor
     
-    ; Get input
+
     mov ah, 0x00
     int 0x16
     
-    ; Process key
+
     call process_notepad_input
-    cmp al, 0x1B  ; ESC key
+    cmp al, 0x1B 
     jne .notepad_loop
     
-    ; Exit notepad
+
     call clear_content_area
     mov si, notepad_exit_msg
     call print_string_wrapped
@@ -3262,9 +3115,7 @@ notepad_app:
 ; Draw notepad border
 draw_notepad_border:
     pusha
-    ; Draw border inside content area (lines 5-19, columns 15-65)
-    
-    ; Top border (line 5, columns 15-65)
+
     mov dh, 5
     mov dl, 15
     mov cx, 51
@@ -3273,12 +3124,12 @@ draw_notepad_border:
     mov bh, 0x00
     int 0x10
     mov ah, 0x0E
-    mov al, 0xC4  ; Horizontal line
+    mov al, 0xC4 
     int 0x10
     inc dl
     loop .top_border
     
-    ; Bottom border (line 19, columns 15-65)
+
     mov dh, 19
     mov dl, 15
     mov cx, 51
@@ -3287,12 +3138,12 @@ draw_notepad_border:
     mov bh, 0x00
     int 0x10
     mov ah, 0x0E
-    mov al, 0xC4  ; Horizontal line
+    mov al, 0xC4  
     int 0x10
     inc dl
     loop .bottom_border
     
-    ; Left border (lines 6-18, column 15)
+
     mov dh, 6
     mov dl, 15
     mov cx, 13
@@ -3301,12 +3152,12 @@ draw_notepad_border:
     mov bh, 0x00
     int 0x10
     mov ah, 0x0E
-    mov al, 0xB3  ; Vertical line
+    mov al, 0xB3 
     int 0x10
     inc dh
     loop .left_border
     
-    ; Right border (lines 6-18, column 65)
+
     mov dh, 6
     mov dl, 65
     mov cx, 13
@@ -3315,19 +3166,19 @@ draw_notepad_border:
     mov bh, 0x00
     int 0x10
     mov ah, 0x0E
-    mov al, 0xB3  ; Vertical line
+    mov al, 0xB3 
     int 0x10
     inc dh
     loop .right_border
     
-    ; Corners
+
     mov ah, 0x02
     mov bh, 0x00
     mov dh, 5
     mov dl, 15
     int 0x10
     mov ah, 0x0E
-    mov al, 0xDA  ; Top-left
+    mov al, 0xDA  
     int 0x10
     
     mov ah, 0x02
@@ -3336,7 +3187,7 @@ draw_notepad_border:
     mov dl, 65
     int 0x10
     mov ah, 0x0E
-    mov al, 0xBF  ; Top-right
+    mov al, 0xBF  
     int 0x10
     
     mov ah, 0x02
@@ -3345,7 +3196,7 @@ draw_notepad_border:
     mov dl, 15
     int 0x10
     mov ah, 0x0E
-    mov al, 0xC0  ; Bottom-left
+    mov al, 0xC0 
     int 0x10
     
     mov ah, 0x02
@@ -3354,7 +3205,7 @@ draw_notepad_border:
     mov dl, 65
     int 0x10
     mov ah, 0x0E
-    mov al, 0xD9  ; Bottom-right
+    mov al, 0xD9  
     int 0x10
     
     ; Title
@@ -3369,33 +3220,33 @@ draw_notepad_border:
     popa
     ret
 
-; Initialize notepad - SIMPLIFIED
+
 init_notepad:
-    ; Clear buffer with spaces instead of zeros for better visibility
+
     mov di, notepad_buffer
-    mov cx, 637  ; 13 lines * 49 chars = 637 bytes
-    mov al, ' '  ; Fill with spaces instead of zeros
+    mov cx, 637  
+    mov al, ' '  
 .clear_buffer:
     mov [di], al
     inc di
     loop .clear_buffer
     
-    ; Null terminate the buffer
+
     mov di, notepad_buffer
     add di, 636
     mov byte [di], 0
     
-    ; Initialize cursor
+
     mov byte [cursor_x], 0
     mov byte [cursor_y], 0
     
     ret
 
-; Draw notepad content - SIMPLIFIED AND WORKING
+
 draw_notepad_content:
     pusha
     
-    ; Clear only the text area (lines 6-18, columns 16-64)
+
     mov dh, 6
 .clear_lines:
     cmp dh, 19
@@ -3422,27 +3273,27 @@ draw_notepad_content:
     jmp .clear_lines
 
 .draw_content:
-    ; Start drawing from the beginning of the text area
-    mov dh, 6      ; Start row
-    mov dl, 16     ; Start column
-    mov si, notepad_buffer  ; Start of buffer
+
+    mov dh, 6    
+    mov dl, 16  
+    mov si, notepad_buffer  
     
 .draw_line:
-    ; Set cursor position for this line
+
     mov ah, 0x02
     mov bh, 0x00
     int 0x10
     
-    ; Draw one line (49 characters max)
-    mov cx, 49     ; Characters per line
+
+    mov cx, 49  
 .draw_char:
     mov al, [si]
-    cmp al, 0      ; End of buffer
+    cmp al, 0   
     je .draw_done
-    cmp al, 13     ; Skip carriage returns in display
+    cmp al, 13    
     je .skip_cr
     
-    ; Print the character
+
     mov ah, 0x0E
     int 0x10
     
@@ -3451,10 +3302,10 @@ draw_notepad_content:
     inc dl
     loop .draw_char
     
-    ; Move to next line
+
     inc dh
     mov dl, 16
-    cmp dh, 19     ; Check if we've reached the bottom
+    cmp dh, 19  
     jl .draw_line
 
 .draw_done:
@@ -3464,11 +3315,11 @@ draw_notepad_content:
 ; Position cursor in notepad
 position_notepad_cursor:
     pusha
-    ; Calculate screen position from cursor coordinates
+
     mov dh, [cursor_y]
-    add dh, 6      ; Offset for border (starts at row 6)
+    add dh, 6     
     mov dl, [cursor_x]
-    add dl, 16     ; Offset for border (starts at column 16)
+    add dl, 16    
     
     mov ah, 0x02
     mov bh, 0x00
@@ -3476,13 +3327,13 @@ position_notepad_cursor:
     popa
     ret
 
-; Process notepad input - SIMPLIFIED
+
 process_notepad_input:
-    ; Check for Enter key first (this was the main issue)
+
     cmp al, 0x0D   ; Enter key
     je .enter
     
-    ; Check for special keys
+
     cmp ah, 0x48   ; Up arrow
     je .arrow_up
     cmp ah, 0x50   ; Down arrow
@@ -3492,13 +3343,13 @@ process_notepad_input:
     cmp ah, 0x4D   ; Right arrow
     je .arrow_right
     
-    ; Check for other keys
+
     cmp al, 0x08   ; Backspace
     je .backspace
     cmp al, 0x1B   ; ESC
     je .done
     
-    ; Regular printable character
+
     cmp al, 32
     jl .done
     cmp al, 126
@@ -3514,7 +3365,7 @@ process_notepad_input:
     jmp .done
 
 .arrow_down:
-    cmp byte [cursor_y], 12   ; Max 13 lines (0-12)
+    cmp byte [cursor_y], 12  
     je .done
     inc byte [cursor_y]
     jmp .done
@@ -3526,7 +3377,7 @@ process_notepad_input:
     jmp .done
 
 .arrow_right:
-    cmp byte [cursor_x], 48   ; Max 49 chars per line (0-48)
+    cmp byte [cursor_x], 48  
     je .done
     inc byte [cursor_x]
     jmp .done
@@ -3542,10 +3393,10 @@ process_notepad_input:
 .done:
     ret
 
-; Add character to buffer - SIMPLIFIED
+
 add_character:
     pusha
-    ; Calculate buffer position
+
     call calculate_buffer_position
     
     ; Store the character
@@ -3553,84 +3404,82 @@ add_character:
     
     ; Move cursor right
     inc byte [cursor_x]
-    cmp byte [cursor_x], 49   ; Check if we need to wrap
+    cmp byte [cursor_x], 49  
     jl .add_done
     
     ; Auto-wrap to next line
     mov byte [cursor_x], 0
     inc byte [cursor_y]
-    cmp byte [cursor_y], 13   ; Check if we're at the bottom
+    cmp byte [cursor_y], 13   
     jl .add_done
-    mov byte [cursor_y], 12   ; Stay at bottom
+    mov byte [cursor_y], 12  
 
 .add_done:
     popa
     ret
 
-; Delete character from buffer - SIMPLIFIED
+
 delete_character:
     pusha
     cmp byte [cursor_x], 0
     jne .delete_normal
     
-    ; At start of line - can't delete further left
+
     popa
     ret
 
 .delete_normal:
-    ; Move left and replace with space
+
     dec byte [cursor_x]
     call calculate_buffer_position
-    mov byte [si], ' '  ; Replace with space
+    mov byte [si], ' ' 
     
     popa
     ret
 
-; Add newline - SIMPLIFIED AND WORKING
+
 add_newline:
     pusha
     
-    ; Calculate current position in buffer
+
     call calculate_buffer_position
     
-    ; Find the end of current line to insert newline properly
+
     mov di, si
-    add di, (49 - 1)  ; Move to end of line (49 chars per line)
+    add di, (49 - 1)  
     
-    ; Calculate start of next line
+
     mov si, notepad_buffer
     mov al, [cursor_y]
-    inc al           ; Next line
+    inc al          
     mov bl, 49
     mul bl
-    add si, ax       ; SI now points to start of next line
+    add si, ax      
     
-    ; Shift content down if we're not at the last line
-    cmp byte [cursor_y], 11   ; Don't shift if we're at the second last line
+
+    cmp byte [cursor_y], 11   
     jge .just_move_cursor
     
-    ; Simple approach: just move the cursor to next line
-    ; In a more advanced version, you'd shift the buffer content here
+
 
 .just_move_cursor:
-    ; Move cursor to start of next line
+
     mov byte [cursor_x], 0
     inc byte [cursor_y]
-    cmp byte [cursor_y], 13   ; Check bounds
+    cmp byte [cursor_y], 13 
     jl .newline_done
-    mov byte [cursor_y], 12   ; Stay at bottom
+    mov byte [cursor_y], 12   
 
 .newline_done:
     popa
     ret
 
-; Calculate buffer position from cursor - SIMPLIFIED
-; Returns: SI = pointer to current position in buffer
+
 calculate_buffer_position:
     push ax
     push bx
     
-    ; Position = (cursor_y * 49) + cursor_x
+
     mov al, [cursor_y]
     mov bl, 49
     mul bl
@@ -3691,27 +3540,19 @@ cmd_reboot db "reboot", 0
 cmd_calc db "calculator", 0
 cmd_snake db "snake", 0
 cmd_pong db "pong", 0
-; Gallery commands
 cmd_gallery db "gallery", 0
 cmd_cat db "cat", 0
 cmd_ship db "over", 0
 cmd_tree db "tree", 0
 cmd_chud db "chud", 0
-; Memory info command
 cmd_mem db "memory", 0
-; Space Invaders command
 cmd_invaders db "invaders", 0
-; Notepad command
 cmd_notepad db "notepad", 0
-; Add this with your other command strings
 cmd_type db "type", 0
-; Add these with your other command strings
 cmd_sysinfo db "sysinfo", 0
 cmd_diskinfo db "diskinfo", 0
 
 ; Help message
-
-
 help_msg db "                         Available commands:", 13, 10, \
             "[ == help == ]  [ == clear == ]  [ == info == ] [ == sysinfo == ]", 13, 10, \
             "[ == time == ]  [ == about == ]  [ == reboot ==] [ == diskinfo == ]", 13, 10, \
@@ -3779,14 +3620,13 @@ boot_screen:
 
 
 ; Snake game data
-; Snake game data
 snake_instructions db "Snake Game - Use arrow keys or WASD to move", 13, 10, \
                    "Press any key to start...", 13, 10, 0
 snake_game_over db "Game Over! Press any key to return.", 13, 10, 0
 snake_length db 0
 snake_x times 100 db 0
 snake_y times 100 db 0
-snake_dir db 0  ; 0=right, 1=down, 2=left, 3=up
+snake_dir db 0 
 food_x db 0
 food_y db 0
 
@@ -3807,7 +3647,7 @@ player_y db 0
 cpu_y db 0
 ball_x db 0
 ball_y db 0
-ball_dir db 0  ; 1=right, -1=left
+ball_dir db 0  
 player_score db 0
 cpu_score db 0
 
@@ -3838,31 +3678,12 @@ ship_art:
     db " ....................                  .....................", 10, 0
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 tree_art:
     db "   *   ", 13, 10
     db "  ***  ", 13, 10
     db " ***** ", 13, 10
     db "*******", 13, 10
     db "  |||  ", 13, 10, 0
-
-
 
 chud_art:
     db "        ..:-=++++=-:......       ", 10
@@ -3883,24 +3704,6 @@ chud_art:
     db "         .-.  .::::  .:.         ", 10
     db "           .=.     .-.           ", 10
     db "            ..:---..             ", 10, 0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 mini_cat_art:
@@ -3957,11 +3760,11 @@ player_x db 0
 player_bullet_x db 0
 player_bullet_y db 0
 player_bullet_active db 0
-alien_x times 30 db 0    ; 5 rows x 6 columns = 30 aliens
+alien_x times 30 db 0   
 alien_y times 30 db 0
-alien_active times 30 db 1  ; 1 = active, 0 = destroyed
-alien_direction db 1        ; 1 = right, -1 = left
-alien_speed db 15           ; Movement counter
+alien_active times 30 db 1 
+alien_direction db 1      
+alien_speed db 15       
 alien_bullet_x db 0
 alien_bullet_y db 0
 alien_bullet_active db 0
@@ -3978,7 +3781,7 @@ notepad_exit_msg db "Notepad closed.", 13, 10, 0
 notepad_status db "Editing | ESC to exit", 0
 
 ; Notepad state
-notepad_buffer times 585 db 0  ; 14 lines x 60 chars = 840 bytes
+notepad_buffer times 585 db 0  
 cursor_x db 0
 cursor_y db 0
 buffer_pos dw 0
@@ -3998,7 +3801,7 @@ type_lives_msg db "Lives: ",0
 type_final_score db "Final Score: ",0
 type_prompt db "Type: ",0
 
-; Word list (all 6 bytes each including null terminator)
+; Word list
 type_words:
     db "HELLO",0
     db "WORLD",0  
@@ -4048,8 +3851,6 @@ kb_msg db " KB",13,10,0
 
 
 
-; Buffer
-buffer times 64 db 0
 
-; Fill to 4096 bytes
+buffer times 64 db 0
 times 16384-($-$$) db 0

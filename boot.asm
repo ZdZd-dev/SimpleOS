@@ -8,7 +8,7 @@ start:
     mov ss, ax
     mov sp, 0x7C00
 
-    ; Load kernel silently
+
     mov bx, 0x7E00
     mov ah, 0x02
     mov al, 32
